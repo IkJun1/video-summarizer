@@ -31,18 +31,27 @@
 uv pip install -r requirements.txt
 ```
 
-### 2) 실행
+### 2) 입력 파일 경로 수정
+`main.py`에서 `input_path`를 원하는 파일로 바꿉니다.
+
+```python
+# main.py
+input_path = Path("data/origin/call_of_duty.mp4")
+```
+
+### 3) 실행
 ```
 uv run main.py
 ```
 
-### 3) 결과
+### 4) 결과
 - 요약 영상: `data/summary_videos/` 폴더에 저장
 
 ---
 
 ## 설정값 변경
-모든 주요 파라미터는 `config.py`에서 관리합니다.
+모든 주요 파라미터는 `config.py`에서 관리합니다.  
+모델 설정(모델 ID, 디바이스 등)도 `config.py`에서 수정할 수 있습니다.
 
 예: 요약 길이 비율 조정
 ```python
