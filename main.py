@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pipeline import IOConfig, PipelineConfig, run_pipeline_with_default_models
-from pseudo_score import ClusterScoreConfig
+from pipeline import run_pipeline_with_default_models
+from config import IOConfig, PipelineConfig, ClusterScoreConfig
 
 
 def main() -> None:
-    input_path = Path("data/origin/call_of_duty.mp4")
+    input_path = Path("examples/input_video.mp4")
     io_cfg = IOConfig(input_video=input_path)
     k_ratio = 0.1  # adjust summary length
     pipe_cfg = PipelineConfig(cluster=ClusterScoreConfig(k_ratio=k_ratio))

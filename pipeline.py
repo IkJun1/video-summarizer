@@ -8,35 +8,15 @@ import torch
 
 from tqdm import tqdm
 
-from pseudo_score import (
-    ClusterScoreConfig,
-    FrameChangeConfig,
-    FinalScoreConfig,
+from score import (
     cluster_center_scores,
     cluster_center_scores_single,
     clip_frame_change_score,
     combine_cluster_and_change_scores,
 )
-from video_preprocess import ClipConfig, compute_clip_frame_ranges
-from model_loader import ModelLoaderConfig, load_models
-
-
-@dataclass(frozen=True)
-class IOConfig:
-    input_video: Path
-    output_dir: Path = Path("data/summary_videos")
-    save_intermediate_clips: bool = False
-    clips_dir: Path = Path("data/clip")
-    write_audio: bool = True
-
-
-@dataclass(frozen=True)
-class PipelineConfig:
-    clip: ClipConfig = ClipConfig(fps=4, clip_sec=4.0, overlap_sec=2.0)
-    cluster: ClusterScoreConfig = ClusterScoreConfig()
-    frame_change: FrameChangeConfig = FrameChangeConfig()
-    final_score: FinalScoreConfig = FinalScoreConfig()
-    use_single_embedding_for_cluster: bool = True
+from video_preprocess import compute_clip_frame_ranges
+from model_loader import load_models
+from config import IOConfig, PipelineConfig, ModelLoaderConfig, ClipConfig
 
 
 @dataclass(frozen=True)

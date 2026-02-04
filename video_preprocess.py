@@ -1,18 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
 from typing import List, Optional, Tuple
 
-
-@dataclass(frozen=True)
-class ClipConfig:
-    fps: float # 프레임
-    clip_sec: float # 클립 길이 (초)
-    overlap_sec: float = 0.0 # 겹치는 구간 길이 (초)
-    start_sec: Optional[float] = None # None이면 영상 시작부터
-    end_sec: Optional[float] = None # None이면 영상 끝까지
-    include_tail: bool = False # 마지막 클립 포함 여부
+from config import ClipConfig
 
 
 def _sec_to_frame(sec: float, fps: float) -> int:

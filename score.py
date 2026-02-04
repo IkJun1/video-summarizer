@@ -1,31 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Tuple
 
 import torch
 
-
-@dataclass(frozen=True)
-class ClusterScoreConfig:
-    k_ratio: float = 0.1
-    top_ratio_per_cluster: float = 0.2
-    num_iters: int = 20
-    eps: float = 1e-8
-    normalize_before_concat: bool = True
-
-
-@dataclass(frozen=True)
-class FrameChangeConfig:
-    step: int = 3
-    eps: float = 1e-8
-
-
-@dataclass(frozen=True)
-class FinalScoreConfig:
-    a: float = 1.0
-    b: float = 0.5
-    c: float = 0.0
+from config import ClusterScoreConfig, FinalScoreConfig, FrameChangeConfig
 
 
 def _normalize(x: torch.Tensor, eps: float) -> torch.Tensor:

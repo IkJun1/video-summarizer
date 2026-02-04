@@ -1,19 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Tuple
 
 import torch
 from torch import nn
 import numpy as np
 
-
-@dataclass(frozen=True)
-class ModelLoaderConfig:
-    device: str = "cuda" if torch.cuda.is_available() else "cpu"
-    clip_vit_id: str = "openai/clip-vit-base-patch32"
-    pe_av_id: str = "facebook/pe-av-base"
-    use_fp16: bool = False
+from config import ModelLoaderConfig
 
 
 class ClipVisionWrapper(nn.Module):
