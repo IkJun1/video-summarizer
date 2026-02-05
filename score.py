@@ -6,7 +6,6 @@ import torch
 
 from config import (
     ClusterScoreConfig,
-    FinalScoreConfig,
     FrameChangeConfig,
     SemanticScoreConfig,
 )
@@ -252,18 +251,3 @@ def clip_frame_change_score(
     cos = _cosine_similarity(emb_a, emb_b, cfg.eps)
     chg = (1.0 - cos) * 0.5
     return chg.mean()
-
-
-def combine_cluster_and_change_scores(
-    cluster_scores: torch.Tensor,
-    change_scores: torch.Tensor,
-    cfg: FinalScoreConfig,
-) -> torch.Tensor:
-    """
-    Combine scores: a*C + b*D + c*(C*D)
-    """
-    if cluster_scores.shape != change_scores.shape:
-        raise ValueError("cluster_scores and change_scores must have same shape")
-    return cfg.a * cluster_scores + cfg.b * change_scores + cfg.c * (
-        cluster_scores * change_scores
-    )

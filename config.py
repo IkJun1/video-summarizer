@@ -34,13 +34,6 @@ class FrameChangeConfig:
 
 
 @dataclass(frozen=True)
-class FinalScoreConfig:
-    a: float = 1.0
-    b: float = 0.5
-    c: float = 0.0
-
-
-@dataclass(frozen=True)
 class SemanticScoreConfig:
     use_rare_score: bool = True
     eps: float = 1e-8
@@ -69,7 +62,6 @@ class PipelineConfig:
     clip: ClipConfig = ClipConfig(fps=4, clip_sec=4.0, overlap_sec=2.0)
     cluster: ClusterScoreConfig = ClusterScoreConfig()
     frame_change: FrameChangeConfig = FrameChangeConfig()
-    final_score: FinalScoreConfig = FinalScoreConfig()  # deprecated, kept for compatibility
     semantic: SemanticScoreConfig = SemanticScoreConfig()
     selection: SelectionConfig = SelectionConfig()
     use_single_embedding_for_cluster: bool = True
