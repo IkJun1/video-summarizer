@@ -152,34 +152,36 @@ def _select_with_mmr(
     remaining = set(candidate_indices)
     sorted_candidates = sorted(candidate_indices)
 
-    while remaining and len(chosen) < target_count:
-        best_idx = None
-        best_score = float("-inf")
+    with tqdm(total=target_count, desc="MMR select", unit="clip") as pbar:
+        while remaining and len(chosen) < target_count:
+            best_idx = None
+            best_score = float("-inf")
 
-        for idx in sorted_candidates:
-            if idx not in remaining:
-                continue
-            if min_gap_sec > 0.0:
-                start_sec = ranges[idx][0] / fps
-                if any(abs(start_sec - (ranges[j][0] / fps)) < min_gap_sec for j in chosen):
+            for idx in sorted_candidates:
+                if idx not in remaining:
                     continue
+                if min_gap_sec > 0.0:
+                    start_sec = ranges[idx][0] / fps
+                    if any(abs(start_sec - (ranges[j][0] / fps)) < min_gap_sec for j in chosen):
+                        continue
 
-            rel = float(base_scores[idx].item())
-            if not chosen:
-                mmr_score = rel
-            else:
-                sims = torch.matmul(z[chosen], z[idx])
-                redundancy = float(torch.max(sims).item())
-                mmr_score = (lambda_mmr * rel) - ((1.0 - lambda_mmr) * redundancy)
+                rel = float(base_scores[idx].item())
+                if not chosen:
+                    mmr_score = rel
+                else:
+                    sims = torch.matmul(z[chosen], z[idx])
+                    redundancy = float(torch.max(sims).item())
+                    mmr_score = (lambda_mmr * rel) - ((1.0 - lambda_mmr) * redundancy)
 
-            if mmr_score > best_score:
-                best_score = mmr_score
-                best_idx = idx
+                if mmr_score > best_score:
+                    best_score = mmr_score
+                    best_idx = idx
 
-        if best_idx is None:
-            break
-        chosen.append(best_idx)
-        remaining.remove(best_idx)
+            if best_idx is None:
+                break
+            chosen.append(best_idx)
+            remaining.remove(best_idx)
+            pbar.update(1)
 
     return chosen
 
