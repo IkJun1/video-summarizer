@@ -12,7 +12,7 @@ from score import (
     cluster_center_scores,
     cluster_center_scores_single,
     clip_frame_change_score,
-    combine_cluster_and_change_scores,
+    rare_semantic_scores,
 )
 from video_preprocess import compute_clip_frame_ranges
 from model_loader import load_models
@@ -124,6 +124,66 @@ def _encode_clip_av(
     return v_emb, a_emb
 
 
+def _minmax_normalize(x: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
+    if x.numel() == 0:
+        return x
+    x_min = torch.min(x)
+    x_max = torch.max(x)
+    denom = (x_max - x_min).clamp_min(eps)
+    return (x - x_min) / denom
+
+
+def _select_with_mmr(
+    candidate_indices: List[int],
+    base_scores: torch.Tensor,
+    emb: torch.Tensor,
+    ranges: List[Tuple[int, int]],
+    fps: float,
+    target_count: int,
+    lambda_mmr: float,
+    min_gap_sec: float,
+    eps: float = 1e-8,
+) -> List[int]:
+    if not candidate_indices:
+        return []
+
+    z = emb / (emb.norm(p=2, dim=-1, keepdim=True) + eps)
+    chosen: List[int] = []
+    remaining = set(candidate_indices)
+    sorted_candidates = sorted(candidate_indices)
+
+    while remaining and len(chosen) < target_count:
+        best_idx = None
+        best_score = float("-inf")
+
+        for idx in sorted_candidates:
+            if idx not in remaining:
+                continue
+            if min_gap_sec > 0.0:
+                start_sec = ranges[idx][0] / fps
+                if any(abs(start_sec - (ranges[j][0] / fps)) < min_gap_sec for j in chosen):
+                    continue
+
+            rel = float(base_scores[idx].item())
+            if not chosen:
+                mmr_score = rel
+            else:
+                sims = torch.matmul(z[chosen], z[idx])
+                redundancy = float(torch.max(sims).item())
+                mmr_score = (lambda_mmr * rel) - ((1.0 - lambda_mmr) * redundancy)
+
+            if mmr_score > best_score:
+                best_score = mmr_score
+                best_idx = idx
+
+        if best_idx is None:
+            break
+        chosen.append(best_idx)
+        remaining.remove(best_idx)
+
+    return chosen
+
+
 
 
 def run_pipeline(io: IOConfig, cfg: PipelineConfig, models: Models) -> Path:
@@ -215,23 +275,47 @@ def run_pipeline(io: IOConfig, cfg: PipelineConfig, models: Models) -> Path:
             clip_frames, models.vit_model, cfg.frame_change
         )
 
-    final_scores = combine_cluster_and_change_scores(
-        cluster_scores, change_scores, cfg.final_score
-    )
+    if not (0.0 < cfg.selection.summary_ratio <= 1.0):
+        raise ValueError("selection.summary_ratio must be in (0, 1]")
+    if not (0.0 <= cfg.selection.lambda_mmr <= 1.0):
+        raise ValueError("selection.lambda_mmr must be in [0, 1]")
+    if cfg.selection.min_gap_sec < 0.0:
+        raise ValueError("selection.min_gap_sec must be >= 0")
+    if cfg.selection.dynamic_weight < 0.0 or cfg.selection.semantic_weight < 0.0:
+        raise ValueError("selection dynamic/semantic weights must be >= 0")
+    if (cfg.selection.dynamic_weight + cfg.selection.semantic_weight) <= 0.0:
+        raise ValueError("sum of selection weights must be > 0")
 
-    # One representative per cluster: pick highest final score within each cluster
-    # among selected candidates.
-    k = max(1, int(round(len(ranges) * cfg.cluster.k_ratio)))
-    chosen: List[int] = []
-    for ci in range(k):
-        idx = torch.nonzero(assignments == ci, as_tuple=False).squeeze(-1)
-        if idx.numel() == 0:
-            continue
-        idx = idx[selected_mask[idx]]
-        if idx.numel() == 0:
-            continue
-        best_local = idx[torch.argmax(final_scores[idx])].item()
-        chosen.append(best_local)
+    fused_semantic = torch.cat([v_mat, a_mat], dim=-1)
+    if cfg.semantic.use_rare_score:
+        semantic_scores = rare_semantic_scores(fused_semantic, cfg.semantic)
+    else:
+        semantic_scores = torch.zeros_like(cluster_scores)
+
+    candidate_idx = torch.nonzero(selected_mask, as_tuple=False).squeeze(-1)
+    cand_change = _minmax_normalize(change_scores[candidate_idx], cfg.frame_change.eps)
+    cand_semantic = _minmax_normalize(semantic_scores[candidate_idx], cfg.semantic.eps)
+    weight_sum = cfg.selection.dynamic_weight + cfg.selection.semantic_weight
+    w_dyn = cfg.selection.dynamic_weight / weight_sum
+    w_sem = cfg.selection.semantic_weight / weight_sum
+    cand_base = (w_dyn * cand_change) + (w_sem * cand_semantic)
+
+    base_scores = torch.zeros_like(cluster_scores)
+    base_scores[candidate_idx] = cand_base
+
+    target_count = max(1, int(round(len(ranges) * cfg.selection.summary_ratio)))
+    target_count = min(target_count, int(candidate_idx.numel()))
+    chosen = _select_with_mmr(
+        candidate_indices=selected_indices,
+        base_scores=base_scores,
+        emb=fused_semantic,
+        ranges=ranges,
+        fps=fps,
+        target_count=target_count,
+        lambda_mmr=cfg.selection.lambda_mmr,
+        min_gap_sec=cfg.selection.min_gap_sec,
+        eps=cfg.semantic.eps,
+    )
 
     chosen = sorted(chosen, key=lambda i: ranges[i][0])
     if not chosen:

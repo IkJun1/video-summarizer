@@ -41,6 +41,21 @@ class FinalScoreConfig:
 
 
 @dataclass(frozen=True)
+class SemanticScoreConfig:
+    use_rare_score: bool = True
+    eps: float = 1e-8
+
+
+@dataclass(frozen=True)
+class SelectionConfig:
+    summary_ratio: float = 0.1
+    dynamic_weight: float = 0.5
+    semantic_weight: float = 0.5
+    lambda_mmr: float = 0.7
+    min_gap_sec: float = 0.0
+
+
+@dataclass(frozen=True)
 class IOConfig:
     input_video: Path
     output_dir: Path = Path("data/summary_videos")
@@ -54,7 +69,9 @@ class PipelineConfig:
     clip: ClipConfig = ClipConfig(fps=4, clip_sec=4.0, overlap_sec=2.0)
     cluster: ClusterScoreConfig = ClusterScoreConfig()
     frame_change: FrameChangeConfig = FrameChangeConfig()
-    final_score: FinalScoreConfig = FinalScoreConfig()
+    final_score: FinalScoreConfig = FinalScoreConfig()  # deprecated, kept for compatibility
+    semantic: SemanticScoreConfig = SemanticScoreConfig()
+    selection: SelectionConfig = SelectionConfig()
     use_single_embedding_for_cluster: bool = True
 
 

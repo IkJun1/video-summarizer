@@ -4,7 +4,12 @@ from typing import Tuple
 
 import torch
 
-from config import ClusterScoreConfig, FinalScoreConfig, FrameChangeConfig
+from config import (
+    ClusterScoreConfig,
+    FinalScoreConfig,
+    FrameChangeConfig,
+    SemanticScoreConfig,
+)
 
 
 def _normalize(x: torch.Tensor, eps: float) -> torch.Tensor:
@@ -194,6 +199,21 @@ def _ensure_frame_emb(emb: torch.Tensor) -> torch.Tensor:
     if emb.dim() != 2:
         raise ValueError("frame embeddings must be a 2D tensor (T, D)")
     return emb
+
+
+def rare_semantic_scores(emb: torch.Tensor, cfg: SemanticScoreConfig) -> torch.Tensor:
+    """
+    Rare semantic score based on distance from global mean embedding.
+    Returns score in [0, 1], higher means more semantically rare.
+    """
+    if emb.dim() != 2:
+        raise ValueError("emb must be a 2D tensor (N, D)")
+
+    z = _normalize(emb, cfg.eps)
+    mu = z.mean(dim=0, keepdim=True)
+    mu = _normalize(mu, cfg.eps)
+    sim = _cosine_similarity(z, mu.expand_as(z), cfg.eps)
+    return ((1.0 - sim) * 0.5).clamp(0.0, 1.0)
 
 
 def clip_frame_change_score(
