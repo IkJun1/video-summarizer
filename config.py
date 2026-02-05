@@ -8,18 +8,18 @@ import torch
 
 
 @dataclass(frozen=True)
-class ClipConfig:
+class ClipConfig: # 하단의 PipelineConfig에서 사용
     fps: float
     clip_sec: float
     overlap_sec: float = 0.0
-    start_sec: Optional[float] = None
-    end_sec: Optional[float] = None
+    start_sec: Optional[float] = None # None이면 영상 시작부터
+    end_sec: Optional[float] = None # None이면 영상 끝까지
     include_tail: bool = False
 
 
 @dataclass(frozen=True)
 class ClusterScoreConfig:
-    k_ratio: float = 0.1
+    k_ratio: float = 0.1 # main.py에서 사용중
     top_ratio_per_cluster: float = 0.2
     num_iters: int = 20
     eps: float = 1e-8
