@@ -28,7 +28,7 @@
 
 ### 1) 의존성 설치
 ```
-uv pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 ### 2) 입력 파일 경로 수정
@@ -36,12 +36,12 @@ uv pip install -r requirements.txt
 
 ```python
 # main.py
-input_path = Path("data/origin/call_of_duty.mp4")
+input_path = Path("examples/input_video.mp4")
 ```
 
 ### 3) 실행
 ```
-uv run main.py
+python main.py
 ```
 
 ### 4) 결과
