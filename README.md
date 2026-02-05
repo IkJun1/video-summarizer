@@ -102,4 +102,3 @@ pipe_cfg = PipelineConfig(
 ## 참고
 - `torchvision.io.read_video`는 PyAV가 필요합니다.
 - PE-AV 입력 오디오는 48kHz로 맞춰집니다.
-- MMR 최종 선택 단계는 `tqdm` 진행률(`MMR select`)이 출력됩니다.
