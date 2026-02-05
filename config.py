@@ -21,6 +21,7 @@ class ClipConfig: # 하단의 PipelineConfig에서 사용
 class ClusterScoreConfig:
     k_ratio: float = 0.1 # main.py에서 사용중
     top_ratio_per_cluster: float = 0.2
+    boundary_ratio_in_selected: float = 0.4 # 선택된 후보 중 경계 샘플 비율(0~1)
     num_iters: int = 20
     eps: float = 1e-8
     normalize_before_concat: bool = True

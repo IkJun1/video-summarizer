@@ -93,6 +93,8 @@ def cluster_center_scores(
         raise ValueError("k_ratio must be in (0, 1]")
     if not (0.0 < cfg.top_ratio_per_cluster <= 1.0):
         raise ValueError("top_ratio_per_cluster must be in (0, 1]")
+    if not (0.0 <= cfg.boundary_ratio_in_selected <= 1.0):
+        raise ValueError("boundary_ratio_in_selected must be in [0, 1]")
 
     x = _concat_av(v_emb, a_emb, cfg.normalize_before_concat, cfg.eps)
     n = x.size(0)
@@ -111,8 +113,23 @@ def cluster_center_scores(
         dist_ci = min_dists[idx]
         k_ci = max(1, int(round(idx.numel() * cfg.top_ratio_per_cluster)))
         k_ci = min(k_ci, idx.numel())
-        top_idx = idx[torch.topk(dist_ci, k=k_ci, largest=False).indices]
-        selected[top_idx] = True
+        k_boundary = int(round(k_ci * cfg.boundary_ratio_in_selected))
+        k_boundary = min(k_boundary, k_ci, idx.numel())
+        k_center = k_ci - k_boundary
+
+        chosen = []
+        if k_center > 0:
+            center_local = torch.topk(dist_ci, k=k_center, largest=False).indices
+            chosen.append(idx[center_local])
+
+        if k_boundary > 0:
+            boundary_local = torch.topk(dist_ci, k=k_boundary, largest=True).indices
+            chosen.append(idx[boundary_local])
+
+        if not chosen:
+            continue
+        chosen_idx = torch.unique(torch.cat(chosen, dim=0))
+        selected[chosen_idx] = True
 
     return scores, selected, assign
 
@@ -131,6 +148,8 @@ def cluster_center_scores_single(
         raise ValueError("k_ratio must be in (0, 1]")
     if not (0.0 < cfg.top_ratio_per_cluster <= 1.0):
         raise ValueError("top_ratio_per_cluster must be in (0, 1]")
+    if not (0.0 <= cfg.boundary_ratio_in_selected <= 1.0):
+        raise ValueError("boundary_ratio_in_selected must be in [0, 1]")
 
     n = emb.size(0)
     k = max(1, int(round(n * cfg.k_ratio)))
@@ -148,8 +167,23 @@ def cluster_center_scores_single(
         dist_ci = min_dists[idx]
         k_ci = max(1, int(round(idx.numel() * cfg.top_ratio_per_cluster)))
         k_ci = min(k_ci, idx.numel())
-        top_idx = idx[torch.topk(dist_ci, k=k_ci, largest=False).indices]
-        selected[top_idx] = True
+        k_boundary = int(round(k_ci * cfg.boundary_ratio_in_selected))
+        k_boundary = min(k_boundary, k_ci, idx.numel())
+        k_center = k_ci - k_boundary
+
+        chosen = []
+        if k_center > 0:
+            center_local = torch.topk(dist_ci, k=k_center, largest=False).indices
+            chosen.append(idx[center_local])
+
+        if k_boundary > 0:
+            boundary_local = torch.topk(dist_ci, k=k_boundary, largest=True).indices
+            chosen.append(idx[boundary_local])
+
+        if not chosen:
+            continue
+        chosen_idx = torch.unique(torch.cat(chosen, dim=0))
+        selected[chosen_idx] = True
 
     return scores, selected, assign
 
