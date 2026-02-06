@@ -65,6 +65,7 @@ class PipelineConfig:
     semantic: SemanticScoreConfig = SemanticScoreConfig()
     selection: SelectionConfig = SelectionConfig()
     use_single_embedding_for_cluster: bool = True
+    use_peav_joint_embedding: bool = True  # True면 PE-AV의 단일 멀티모달 임베딩 사용
 
 
 @dataclass(frozen=True)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, cast
 
 import torch
 
@@ -21,9 +21,9 @@ from config import IOConfig, PipelineConfig, ModelLoaderConfig, ClipConfig
 
 @dataclass(frozen=True)
 class Models:
-    video_encoder: torch.nn.Module  # VideoMAEv2
-    audio_encoder: torch.nn.Module  # BEATs
-    vit_model: torch.nn.Module      # CLIP ViT (frame-level)
+    video_encoder: torch.nn.Module  
+    audio_encoder: torch.nn.Module  
+    vit_model: torch.nn.Module  
 
 
 
@@ -124,6 +124,24 @@ def _encode_clip_av(
     return v_emb, a_emb
 
 
+def _encode_clip_joint(
+    clip_frames: torch.Tensor,
+    clip_audio: torch.Tensor,
+    joint_encoder: torch.nn.Module,
+) -> torch.Tensor:
+    """
+    Returns:
+        emb: (D,)
+    """
+    with torch.no_grad():
+        emb = joint_encoder(clip_frames, clip_audio)
+    if isinstance(emb, tuple):
+        emb = emb[0]
+    if emb.dim() > 1:
+        emb = emb.mean(dim=0)
+    return cast(torch.Tensor, emb)
+
+
 def _minmax_normalize(x: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
     if x.numel() == 0:
         return x
@@ -215,6 +233,7 @@ def run_pipeline(io: IOConfig, cfg: PipelineConfig, models: Models) -> Path:
 
     v_embs: List[torch.Tensor] = []
     a_embs: List[torch.Tensor] = []
+    fused_embs: List[torch.Tensor] = []
 
     for s, e in tqdm(ranges, desc="Clip embeddings", unit="clip"):
         start_sec = s / fps
@@ -242,24 +261,43 @@ def run_pipeline(io: IOConfig, cfg: PipelineConfig, models: Models) -> Path:
                 orig_freq=int(round(clip_audio_sr)),
                 new_freq=target_sr,
             )
-        v_emb, a_emb = _encode_clip_av(
-            clip_frames, clip_audio_mono, models.video_encoder, models.audio_encoder
-        )
-        v_embs.append(v_emb)
-        a_embs.append(a_emb)
+        if cfg.use_peav_joint_embedding and models.video_encoder is models.audio_encoder:
+            fused_emb = _encode_clip_joint(
+                clip_frames, clip_audio_mono, models.video_encoder
+            )
+            fused_embs.append(fused_emb)
+        else:
+            v_emb, a_emb = _encode_clip_av(
+                clip_frames, clip_audio_mono, models.video_encoder, models.audio_encoder
+            )
+            v_embs.append(v_emb)
+            a_embs.append(a_emb)
 
-    v_mat = torch.stack(v_embs, dim=0)
-    a_mat = torch.stack(a_embs, dim=0)
+    if fused_embs:
+        fused = torch.stack(fused_embs, dim=0)
+        v_mat = None
+        a_mat = None
+    else:
+        v_mat = torch.stack(v_embs, dim=0)
+        a_mat = torch.stack(a_embs, dim=0)
 
-    if cfg.use_single_embedding_for_cluster:
-        fused = torch.cat([v_mat, a_mat], dim=-1)
+    if fused_embs:
         cluster_scores, selected_mask, assignments = cluster_center_scores_single(
             fused, cfg.cluster
         )
+        fused_semantic = fused
     else:
-        cluster_scores, selected_mask, assignments = cluster_center_scores(
-            v_mat, a_mat, cfg.cluster
-        )
+        if cfg.use_single_embedding_for_cluster:
+            fused = torch.cat([v_mat, a_mat], dim=-1)
+            cluster_scores, selected_mask, assignments = cluster_center_scores_single(
+                fused, cfg.cluster
+            )
+            fused_semantic = fused
+        else:
+            cluster_scores, selected_mask, assignments = cluster_center_scores(
+                v_mat, a_mat, cfg.cluster
+            )
+            fused_semantic = torch.cat([v_mat, a_mat], dim=-1)
     selected_indices = torch.nonzero(selected_mask, as_tuple=False).squeeze(-1).tolist()
     print(f"[INFO] Candidate clips for frame-change scoring: {len(selected_indices)}")
 
@@ -288,7 +326,6 @@ def run_pipeline(io: IOConfig, cfg: PipelineConfig, models: Models) -> Path:
     if (cfg.selection.dynamic_weight + cfg.selection.semantic_weight) <= 0.0:
         raise ValueError("sum of selection weights must be > 0")
 
-    fused_semantic = torch.cat([v_mat, a_mat], dim=-1)
     if cfg.semantic.use_rare_score:
         semantic_scores = rare_semantic_scores(fused_semantic, cfg.semantic)
     else:
